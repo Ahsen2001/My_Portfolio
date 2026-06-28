@@ -74,7 +74,14 @@ CREATE TABLE `projects` (
 --
 
 INSERT INTO `projects` (`id`, `title`, `description`, `github_link`, `created_at`) VALUES
-(1, 'IPHS Campus Management System', 'PHP system with role-based access', 'https://github.com/Ahsen2001', '2026-04-05 00:32:04');
+(1, 'IPHS Campus Management System', 'PHP system with role-based access', 'https://github.com/Ahsen2001', '2026-04-05 00:32:04'),
+(2, 'HireHub Job Board Platform', 'A full-stack job board web application built with TypeScript, featuring user profiles, job listings, and application tracking.', 'https://github.com/Ahsen2001/hirehub-job-platform', '2026-06-28 14:15:00'),
+(3, 'Onyxa E-Commerce Portal', 'A modern and feature-rich e-commerce and business solution developed using Laravel and Blade templates.', 'https://github.com/Ahsen2001/onyxa', '2026-06-28 14:15:00'),
+(4, 'Daily Cart Mobile Client', 'A mobile e-commerce client application designed and developed with Dart and Flutter for a seamless user shopping experience.', 'https://github.com/Ahsen2001/daily_cart', '2026-06-28 14:15:00'),
+(5, 'Ibnu Abbas Management System', 'An educational institution administration portal built with TypeScript, managing student records and operations.', 'https://github.com/Ahsen2001/Ibnu_Abbas', '2026-06-28 14:15:00'),
+(6, 'JDik Masjid Management Portal', 'A management and administration web app for masjid activities, built using Laravel and Blade.', 'https://github.com/Ahsen2001/jdik-masjid-management', '2026-06-28 14:15:00'),
+(7, 'Green Wealth Farm Application', 'A custom web application built with PHP for agricultural farm inventory, sales, and employee tracking.', 'https://github.com/Ahsen2001/greenwealthfarm', '2026-06-28 14:15:00'),
+(8, 'Fake News Detection Model', 'A machine learning data mining system developed in Jupyter Notebooks to classify and identify fake news stories.', 'https://github.com/Ahsen2001/Fake-News-Detection', '2026-06-28 14:15:00');
 
 --
 -- Indexes for dumped tables
