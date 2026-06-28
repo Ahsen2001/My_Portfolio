@@ -19,7 +19,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 
     // Attempt message storage in database
-    // We try/catch or suppress errors in case the database table doesn't exist yet
     $stmt = @$conn->prepare("INSERT INTO messages (name, email, message) VALUES (?, ?, ?)");
     if ($stmt) {
         $stmt->bind_param("sss", $name, $email, $message);
@@ -30,9 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         $stmt->close();
     } else {
-        // Log locally if db failed, but fallback to file or generic success to keep user UX clean
         error_log("Messages table missing or insert preparation failed. Message: From $name ($email).");
-        // Save to fallback file to prevent loss of message
         $log_entry = date('Y-m-d H:i:s') . " - Name: $name, Email: $email, Message: $message\n";
         @file_put_contents('contact_messages.txt', $log_entry, FILE_APPEND);
         echo json_encode(['status' => 'success', 'message' => 'Your message has been received successfully!']);
@@ -49,10 +46,42 @@ function safe_url($url) {
         return $url;
     }
     if (!isset($parsed['scheme']) && !empty($url)) {
-        // If it starts with github.com or similar
         return 'https://' . ltrim($url, '/');
     }
     return '#';
+}
+
+// 1. Fetch Profile Information
+$profile_res = $conn->query("SELECT * FROM profile LIMIT 1");
+$profile = ($profile_res && $profile_res->num_rows > 0) ? $profile_res->fetch_assoc() : [
+    'name' => 'Umer Ahsen',
+    'title' => 'Full Stack Web Developer',
+    'bio' => 'A motivated and detail-oriented web development graduate with strong hands-on experience in HTML, CSS, JavaScript, PHP, and MySQL. Passionate about building interactive, scalable, and secure applications. I am currently pursuing my BA (Hons) in ICT at the South Eastern University of Sri Lanka.',
+    'profile_image' => 'image/Profile.jpg'
+];
+
+// 2. Fetch Skill Tags
+$skills_list = [];
+$skills_res = $conn->query("SELECT * FROM skills ORDER BY id ASC");
+if ($skills_res && $skills_res->num_rows > 0) {
+    while ($sRow = $skills_res->fetch_assoc()) {
+        $skills_list[] = $sRow['name'];
+    }
+} else {
+    // Fallback static seeds
+    $skills_list = ["HTML / CSS / Javascript", "PHP & MySQL", "ReactJS", "Bootstrap & Responsive Design", "Git & GitHub Workflow"];
+}
+
+// 3. Fetch Certifications
+$certs_list = [];
+$certs_res = $conn->query("SELECT * FROM certifications ORDER BY id ASC");
+if ($certs_res && $certs_res->num_rows > 0) {
+    while ($cRow = $certs_res->fetch_assoc()) {
+        $certs_list[] = $cRow['name'];
+    }
+} else {
+    // Fallback static seeds
+    $certs_list = ["SLASSCOM Fundamentals", "Mobile Phone Repair Technician", "Security & Surveillance Technician", "IT Fundamentals"];
 }
 ?>
 <!DOCTYPE html>
@@ -60,8 +89,8 @@ function safe_url($url) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Umer Ahsen's professional web development portfolio displaying projects, skills, education, and contact form.">
-    <title>Umer Ahsen | Full Stack Web Developer</title>
+    <meta name="description" content="<?php echo htmlspecialchars($profile['name']); ?>'s professional web development portfolio displaying projects, skills, education, and contact form.">
+    <title><?php echo htmlspecialchars($profile['name']); ?> | <?php echo htmlspecialchars($profile['title']); ?></title>
     
     <!-- Link External Stylesheet -->
     <link rel="stylesheet" href="style.css">
@@ -71,7 +100,13 @@ function safe_url($url) {
 
     <!-- NAVBAR -->
     <nav id="navbar">
-        <a href="#home" class="logo">UMER <span>AHSEN</span></a>
+        <a href="#home" class="logo"><?php 
+            $name_parts = explode(' ', $profile['name'], 2);
+            echo htmlspecialchars(strtoupper($name_parts[0])); 
+            if (isset($name_parts[1])) {
+                echo ' <span>' . htmlspecialchars(strtoupper($name_parts[1])) . '</span>';
+            }
+        ?></a>
         
         <!-- Hamburger Menu Toggle -->
         <div class="menu-toggle" aria-label="Toggle Navigation menu" role="button">
@@ -91,8 +126,8 @@ function safe_url($url) {
     <!-- HERO SECTION -->
     <header class="hero-wrapper" id="home">
         <div class="hero-content">
-            <h1>Hi, I'm <span class="gradient-text-alt">Umer Ahsen</span></h1>
-            <p>Full Stack Web Developer crafting secure, high-performance, and responsive web applications.</p>
+            <h1>Hi, I'm <span class="gradient-text-alt"><?php echo htmlspecialchars($profile['name']); ?></span></h1>
+            <p><?php echo htmlspecialchars($profile['title']); ?> crafting secure, high-performance, and responsive web applications.</p>
             <div class="hero-buttons">
                 <a href="#projects" class="btn-primary">View Projects</a>
                 <a href="Umer_Ahsen_CV.pdf" download class="btn-secondary">Download CV</a>
@@ -106,19 +141,17 @@ function safe_url($url) {
             <h2 class="section-header">About Me</h2>
             <div class="profile-grid">
                 <div class="profile-img-container">
-                    <img src="image/Profile.jpg" alt="Umer Ahsen Profile Photo">
+                    <img src="<?php echo htmlspecialchars($profile['profile_image']); ?>" alt="<?php echo htmlspecialchars($profile['name']); ?> Profile Photo">
                 </div>
                 <div class="profile-details">
                     <h3>Who I Am</h3>
-                    <p>A motivated and detail-oriented web development graduate with strong hands-on experience in HTML, CSS, JavaScript, PHP, and MySQL. Passionate about building interactive, scalable, and secure applications. I am currently pursuing my BA (Hons) in ICT at the South Eastern University of Sri Lanka.</p>
+                    <p><?php echo htmlspecialchars($profile['bio']); ?></p>
                     
                     <h3 style="margin-top: 20px; margin-bottom: 15px;">Technical Stack</h3>
                     <div class="skills-tags">
-                        <span>HTML / CSS / Javascript</span>
-                        <span>PHP & MySQL</span>
-                        <span>ReactJS</span>
-                        <span>Bootstrap & Responsive Design</span>
-                        <span>Git & GitHub Workflow</span>
+                        <?php foreach ($skills_list as $skill) { ?>
+                            <span><?php echo htmlspecialchars($skill); ?></span>
+                        <?php } ?>
                     </div>
                 </div>
             </div>
@@ -155,34 +188,33 @@ function safe_url($url) {
         <section class="section" id="timeline">
             <h2 class="section-header">Experience & Education</h2>
             <div class="timeline">
-                <div class="timeline-item">
-                    <div class="timeline-content">
-                        <span class="timeline-date">Nov 2024 - 2025</span>
-                        <h3>Tutor | BRIGHT MINDS COLLEGE</h3>
-                        <p>Instructor leading the Diploma in Computer Basics program, preparing students with foundational computer literacy and systems training.</p>
+                <?php
+                $timeline_res = $conn->query("SELECT * FROM timeline ORDER BY type ASC, id DESC");
+                if ($timeline_res && $timeline_res->num_rows > 0) {
+                    while ($t = $timeline_res->fetch_assoc()) {
+                ?>
+                    <div class="timeline-item">
+                        <div class="timeline-content">
+                            <span class="timeline-date"><?php echo htmlspecialchars($t['duration_dates']); ?></span>
+                            <h3>
+                                <?php echo htmlspecialchars($t['title']); ?> | <?php echo htmlspecialchars($t['subtitle']); ?>
+                                <span style="font-size: 10px; text-transform: uppercase; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: <?php echo $t['type'] === 'experience' ? 'rgba(0,198,255,0.1)' : 'rgba(255,0,127,0.1)'; ?>; color: <?php echo $t['type'] === 'experience' ? 'var(--primary)' : '#ff007f'; ?>; margin-left: 8px; vertical-align: middle;">
+                                    <?php echo htmlspecialchars($t['type']); ?>
+                                </span>
+                            </h3>
+                            <?php if (!empty($t['description'])) { ?>
+                                <p><?php echo htmlspecialchars($t['description']); ?></p>
+                            <?php } ?>
+                        </div>
                     </div>
-                </div>
-                <div class="timeline-item">
-                    <div class="timeline-content">
-                        <span class="timeline-date">Feb 2022 - 2024</span>
-                        <h3>Teacher | AN NOOR ACADEMY</h3>
-                        <p>Delivered student-centered lessons and curriculum guidance over two academic years of school instruction.</p>
+                <?php 
+                    }
+                } else {
+                ?>
+                    <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                        No timeline records listed yet.
                     </div>
-                </div>
-                <div class="timeline-item">
-                    <div class="timeline-content">
-                        <span class="timeline-date">Jul 2022 - Present</span>
-                        <h3>BA (Hons) ICT | South Eastern University of Sri Lanka</h3>
-                        <p>Currently pursuing professional qualifications, with specialization in modern computing methods and information technology systems.</p>
-                    </div>
-                </div>
-                <div class="timeline-item">
-                    <div class="timeline-content">
-                        <span class="timeline-date">Apr 2022 - 2025</span>
-                        <h3>HNDIT | ATI Batticaloa</h3>
-                        <p>Completed Advanced National Diploma in Information Technology, focusing on software engineering, database design, and systems architecture.</p>
-                    </div>
-                </div>
+                <?php } ?>
             </div>
         </section>
 
@@ -190,18 +222,11 @@ function safe_url($url) {
         <section class="section" id="certifications">
             <h2 class="section-header">Certifications</h2>
             <div class="certifications-container">
-                <div class="cert-badge">
-                    <span>SLASSCOM Fundamentals</span>
-                </div>
-                <div class="cert-badge">
-                    <span>Mobile Phone Repair Technician</span>
-                </div>
-                <div class="cert-badge">
-                    <span>Security & Surveillance Technician</span>
-                </div>
-                <div class="cert-badge">
-                    <span>IT Fundamentals</span>
-                </div>
+                <?php foreach ($certs_list as $cert) { ?>
+                    <div class="cert-badge">
+                        <span><?php echo htmlspecialchars($cert); ?></span>
+                    </div>
+                <?php } ?>
             </div>
         </section>
 
@@ -230,7 +255,7 @@ function safe_url($url) {
 
     <!-- FOOTER -->
     <footer>
-        <p>&copy; 2026 Umer Ahsen. All rights reserved.</p>
+        <p>&copy; 2026 <?php echo htmlspecialchars($profile['name']); ?>. All rights reserved.</p>
         <p style="margin-top: 10px;">Connect on <a href="https://www.linkedin.com/in/umerahsen" target="_blank" rel="noopener">LinkedIn</a> | Admin <a href="admin/login.php">Dashboard</a></p>
     </footer>
 

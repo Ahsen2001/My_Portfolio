@@ -103,8 +103,11 @@ if ($msgResult) {
 
 <!-- Sidebar Navigation -->
 <div class="sidebar">
-    <h2>AHSEN <span>PORTFOLIO</span></h2>
+    <h2>AHSEN <span>CMS</span></h2>
     <a href="dashboard.php" class="active">🏠 Dashboard</a>
+    <a href="edit_profile.php">👤 Profile & Skills</a>
+    <a href="manage_timeline.php">⏳ Timeline Info</a>
+    <a href="manage_certs.php">🏆 Certifications</a>
     <a href="add_project.php">➕ Add Project</a>
     <a href="../index.php" target="_blank">🌐 View Site</a>
     <a href="logout.php" style="margin-top: auto; color: var(--danger);">🚪 Logout</a>
