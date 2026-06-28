@@ -1,26 +1,32 @@
 <?php
 session_start();
 include '../config.php';
+include 'csrf.php';
 
-// Protect page
+// Authentication Guard
 if(!isset($_SESSION['admin'])){
     header("Location: login.php");
     exit();
 }
 
-// Validate ID
+// Validate ID parameter
 if(!isset($_GET['id']) || !is_numeric($_GET['id'])){
     die("Invalid ID");
 }
 
-$id = $_GET['id'];
+$id = intval($_GET['id']);
 
 // Fetch project securely
 $stmt = $conn->prepare("SELECT * FROM projects WHERE id=?");
-$stmt->bind_param("i", $id);
-$stmt->execute();
-$result = $stmt->get_result();
-$row = $result->fetch_assoc();
+if ($stmt) {
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+} else {
+    die("Database query failed.");
+}
 
 if(!$row){
     die("Project not found");
@@ -28,150 +34,93 @@ if(!$row){
 
 // Update project
 if(isset($_POST['update'])){
+    // CSRF check
+    validate_csrf_post_or_die();
 
-    $title = trim($_POST['title']);
-    $desc  = trim($_POST['description']);
-    $link  = trim($_POST['github_link']);
+    $title = trim($_POST['title'] ?? '');
+    $desc  = trim($_POST['description'] ?? '');
+    $link  = trim($_POST['github_link'] ?? '');
 
     if(empty($title)){
         $error = "Title is required!";
     } else {
-
-        $stmt = $conn->prepare("UPDATE projects SET title=?, description=?, github_link=? WHERE id=?");
-        $stmt->bind_param("sssi", $title, $desc, $link, $id);
-
-        if($stmt->execute()){
-            header("Location: dashboard.php");
-            exit();
+        // Validate URL format if provided
+        if (!empty($link) && !filter_var($link, FILTER_VALIDATE_URL)) {
+            $error = "Invalid GitHub link format! Must be a valid URL starting with http:// or https://";
         } else {
-            $error = "Update failed!";
+            $stmt = $conn->prepare("UPDATE projects SET title=?, description=?, github_link=? WHERE id=?");
+            if ($stmt) {
+                $stmt->bind_param("sssi", $title, $desc, $link, $id);
+                if($stmt->execute()){
+                    header("Location: dashboard.php");
+                    exit();
+                } else {
+                    $error = "Update execution failed. Please try again.";
+                }
+                $stmt->close();
+            } else {
+                $error = "Failed to prepare database update statement.";
+            }
         }
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Edit Project</title>
-
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
-
-<style>
-
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-    font-family:'Poppins', sans-serif;
-}
-
-body{
-    height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    background: linear-gradient(135deg, #141e30, #243b55);
-}
-
-/* Glass Card */
-.container{
-    width:420px;
-    padding:30px;
-    border-radius:20px;
-    backdrop-filter: blur(15px);
-    background: rgba(255,255,255,0.05);
-    border:1px solid rgba(255,255,255,0.1);
-    box-shadow:0 8px 32px rgba(0,0,0,0.4);
-    animation: fadeIn 0.8s ease;
-}
-
-h2{
-    text-align:center;
-    color:#fff;
-    margin-bottom:20px;
-}
-
-/* Inputs */
-input, textarea{
-    width:100%;
-    padding:12px;
-    margin:10px 0;
-    border:none;
-    border-radius:10px;
-    outline:none;
-    background: rgba(255,255,255,0.1);
-    color:#fff;
-}
-
-input::placeholder, textarea::placeholder{
-    color:#ccc;
-}
-
-/* Button */
-button{
-    width:100%;
-    padding:12px;
-    border:none;
-    border-radius:10px;
-    background:#ff7a18;
-    color:#fff;
-    font-weight:600;
-    cursor:pointer;
-    transition:0.3s;
-}
-
-button:hover{
-    background:#ff3d00;
-    transform:scale(1.05);
-}
-
-/* Error */
-.error{
-    color:#ff6b6b;
-    text-align:center;
-}
-
-/* Animation */
-@keyframes fadeIn{
-    from{
-        opacity:0;
-        transform: translateY(20px);
-    }
-    to{
-        opacity:1;
-        transform: translateY(0);
-    }
-}
-
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Project | Portfolio Manager</title>
+    <!-- Use unified admin stylesheet -->
+    <link rel="stylesheet" href="admin.css">
 </head>
-
 <body>
 
-<div class="container">
+<!-- Sidebar Navigation -->
+<div class="sidebar">
+    <h2>AHSEN <span>PORTFOLIO</span></h2>
+    <a href="dashboard.php">🏠 Dashboard</a>
+    <a href="add_project.php">➕ Add Project</a>
+    <a href="../index.php" target="_blank">🌐 View Site</a>
+    <a href="logout.php" style="margin-top: auto; color: var(--danger);">🚪 Logout</a>
+</div>
 
-    <h2>✏️ Edit Project</h2>
+<!-- Main Area -->
+<div class="main fade">
+    <div class="topbar">
+        <h1>Edit Project</h1>
+        <a href="dashboard.php" style="color: var(--primary); text-decoration: none; font-weight: 600;">← Back to Dashboard</a>
+    </div>
 
-    <?php if(isset($error)){ ?>
-        <p class="error"><?php echo $error; ?></p>
-    <?php } ?>
+    <div class="card" style="max-width: 600px; margin: 0 auto;">
+        <h2 class="section-title">✏️ Edit Project Entry</h2>
 
-    <form method="POST">
+        <?php if(isset($error)){ ?>
+            <div class="toast error"><?php echo htmlspecialchars($error); ?></div>
+        <?php } ?>
 
-        <input type="text" name="title"
-        value="<?php echo htmlspecialchars($row['title']); ?>" required>
+        <form method="POST">
+            <!-- Output CSRF token input field -->
+            <?php echo csrf_field(); ?>
 
-        <textarea name="description"><?php echo htmlspecialchars($row['description']); ?></textarea>
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: 500; color: var(--text-muted); font-size: 14px;">Project Title *</label>
+                <input type="text" name="title" value="<?php echo htmlspecialchars($row['title']); ?>" required class="form-input" style="margin-bottom: 0;">
+            </div>
 
-        <input type="url" name="github_link"
-        value="<?php echo htmlspecialchars($row['github_link']); ?>">
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: 500; color: var(--text-muted); font-size: 14px;">Project Description</label>
+                <textarea name="description" class="form-input" style="margin-bottom: 0;"><?php echo htmlspecialchars($row['description']); ?></textarea>
+            </div>
 
-        <button name="update">Update Project</button>
+            <div style="margin-bottom: 25px;">
+                <label style="font-weight: 500; color: var(--text-muted); font-size: 14px;">GitHub Link (URL)</label>
+                <input type="url" name="github_link" value="<?php echo htmlspecialchars($row['github_link']); ?>" class="form-input" style="margin-bottom: 0;">
+            </div>
 
-    </form>
-
+            <button name="update" class="btn">Update Project</button>
+        </form>
+    </div>
 </div>
 
 </body>

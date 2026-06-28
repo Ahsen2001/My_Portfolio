@@ -1,157 +1,103 @@
 <?php
 session_start();
 include '../config.php';
+include 'csrf.php';
 
+// Authentication Guard
 if(!isset($_SESSION['admin'])){
     header("Location: login.php");
     exit();
 }
 
 if(isset($_POST['add'])){
+    // CSRF verification
+    validate_csrf_post_or_die();
 
-    $title = trim($_POST['title']);
-    $desc  = trim($_POST['description']);
-    $link  = trim($_POST['github_link']);
+    $title = trim($_POST['title'] ?? '');
+    $desc  = trim($_POST['description'] ?? '');
+    $link  = trim($_POST['github_link'] ?? '');
 
     if(empty($title)){
         $error = "Title is required!";
     } else {
-
-        $stmt = $conn->prepare("INSERT INTO projects (title, description, github_link) VALUES (?, ?, ?)");
-        $stmt->bind_param("sss", $title, $desc, $link);
-
-        if($stmt->execute()){
-            header("Location: dashboard.php");
-            exit();
+        // Validate URL format if provided
+        if (!empty($link) && !filter_var($link, FILTER_VALIDATE_URL)) {
+            $error = "Invalid GitHub link format! Must be a valid URL starting with http:// or https://";
         } else {
-            $error = "Error adding project!";
+            $stmt = $conn->prepare("INSERT INTO projects (title, description, github_link) VALUES (?, ?, ?)");
+            if ($stmt) {
+                $stmt->bind_param("sss", $title, $desc, $link);
+
+                if($stmt->execute()){
+                    header("Location: dashboard.php");
+                    exit();
+                } else {
+                    $error = "Database execution error. Failed to add project.";
+                }
+                $stmt->close();
+            } else {
+                $error = "Failed to prepare database statement.";
+            }
         }
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Add Project</title>
-
-<!-- Google Font -->
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
-
-<style>
-
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-    font-family:'Poppins', sans-serif;
-}
-
-/* 🌙 Background Gradient */
-body{
-    height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-}
-
-/* Glass Card */
-.container{
-    width:400px;
-    padding:30px;
-    border-radius:20px;
-    backdrop-filter: blur(15px);
-    background: rgba(255,255,255,0.05);
-    border:1px solid rgba(255,255,255,0.1);
-    box-shadow:0 8px 32px rgba(0,0,0,0.3);
-    animation: fadeIn 0.8s ease;
-}
-
-h2{
-    text-align:center;
-    color:#fff;
-    margin-bottom:20px;
-}
-
-/* Inputs */
-input, textarea{
-    width:100%;
-    padding:12px;
-    margin:10px 0;
-    border:none;
-    border-radius:10px;
-    outline:none;
-    background: rgba(255,255,255,0.1);
-    color:#fff;
-}
-
-input::placeholder, textarea::placeholder{
-    color:#ccc;
-}
-
-/* Button */
-button{
-    width:100%;
-    padding:12px;
-    border:none;
-    border-radius:10px;
-    background:#00c6ff;
-    color:#fff;
-    font-weight:600;
-    cursor:pointer;
-    transition:0.3s;
-}
-
-button:hover{
-    background:#0072ff;
-    transform:scale(1.05);
-}
-
-/* Error */
-.error{
-    color:#ff6b6b;
-    text-align:center;
-}
-
-/* Animation */
-@keyframes fadeIn{
-    from{
-        opacity:0;
-        transform: translateY(20px);
-    }
-    to{
-        opacity:1;
-        transform: translateY(0);
-    }
-}
-
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add New Project | Portfolio Manager</title>
+    <!-- Use unified admin stylesheet -->
+    <link rel="stylesheet" href="admin.css">
 </head>
-
 <body>
 
-<div class="container">
+<!-- Sidebar Navigation -->
+<div class="sidebar">
+    <h2>AHSEN <span>PORTFOLIO</span></h2>
+    <a href="dashboard.php">🏠 Dashboard</a>
+    <a href="add_project.php" class="active">➕ Add Project</a>
+    <a href="../index.php" target="_blank">🌐 View Site</a>
+    <a href="logout.php" style="margin-top: auto; color: var(--danger);">🚪 Logout</a>
+</div>
 
-    <h2>Add New Project</h2>
+<!-- Main Area -->
+<div class="main fade">
+    <div class="topbar">
+        <h1>Add New Project</h1>
+        <a href="dashboard.php" style="color: var(--primary); text-decoration: none; font-weight: 600;">← Back to Dashboard</a>
+    </div>
 
-    <?php if(isset($error)){ ?>
-        <p class="error"><?php echo $error; ?></p>
-    <?php } ?>
+    <div class="card" style="max-width: 600px; margin: 0 auto;">
+        <h2 class="section-title">✨ Create Project Entry</h2>
 
-    <form method="POST">
+        <?php if(isset($error)){ ?>
+            <div class="toast error"><?php echo htmlspecialchars($error); ?></div>
+        <?php } ?>
 
-        <input type="text" name="title" placeholder="Project Title" required>
+        <form method="POST">
+            <!-- Output CSRF token input field -->
+            <?php echo csrf_field(); ?>
 
-        <textarea name="description" placeholder="Description"></textarea>
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: 500; color: var(--text-muted); font-size: 14px;">Project Title *</label>
+                <input type="text" name="title" placeholder="e.g. Campus Management System" required class="form-input" style="margin-bottom: 0;">
+            </div>
 
-        <input type="url" name="github_link" placeholder="GitHub Link">
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: 500; color: var(--text-muted); font-size: 14px;">Project Description</label>
+                <textarea name="description" placeholder="Describe the project features, technical stack used, and goals..." class="form-input" style="margin-bottom: 0;"></textarea>
+            </div>
 
-        <button name="add">Add Project</button>
+            <div style="margin-bottom: 25px;">
+                <label style="font-weight: 500; color: var(--text-muted); font-size: 14px;">GitHub Link (URL)</label>
+                <input type="url" name="github_link" placeholder="e.g. https://github.com/username/project" class="form-input" style="margin-bottom: 0;">
+            </div>
 
-    </form>
-
+            <button name="add" class="btn">Add Project</button>
+        </form>
+    </div>
 </div>
 
 </body>
